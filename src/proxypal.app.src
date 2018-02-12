@@ -1,0 +1,11 @@
+{application, proxypal,
+ [{description, "SOCKS Proxy that chains to current system proxy"},
+  {vsn, "1"},
+  {modules, [@MODULES@]},
+  {registered, [ppal_clientsup]},
+  {mod, {proxypal, []}},
+  {env, [{enabled_protocols, [socks, http]},
+         {listenaddr, "127.0.0.1"},
+         {socksport, 1080},
+         {httpport, 8080}]}
+ ]}.
