@@ -20,9 +20,11 @@ new_client(Name, ClientSocket) ->
     Started = supervisor:start_child(Name, [ClientSocket]),
     case Started of
         {ok, Child} ->
-            gen_tcp:controlling_process(ClientSocket, Child);
+            gen_tcp:controlling_process(ClientSocket, Child),
+            Child ! own_socket;
         {ok, Child, _Info} ->
-            gen_tcp:controlling_process(ClientSocket, Child);
+            gen_tcp:controlling_process(ClientSocket, Child),
+            Child ! own_socket;
         _ -> ok
     end,
     Started.
