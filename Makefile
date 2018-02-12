@@ -6,11 +6,12 @@ empty :=
 space := $(empty) $(empty)
 modules := $(subst $(space),$(comma),$(patsubst src/%.erl,%,$(esrc)))
 
-all: $(ebin) ebin/proxypal.app
+all: $(ebin) ebin/proxypal.app priv/bin/get_proxy
 
 $(ebin): ebin.STAMP
 
 ebin.STAMP: $(esrc)
+	mkdir -p ebin
 	erl -make
 	touch ebin.STAMP
 
@@ -19,6 +20,7 @@ ebin/proxypal.app: src/proxypal.app.src
 	    src/proxypal.app.src > ebin/proxypal.app
 
 priv/bin/get_proxy: c_src/get_proxy.o
+	mkdir -p priv/bin
 	$(CC) $(LDFLAGS) $(LDADD) -o priv/bin/get_proxy c_src/get_proxy.o -lproxy
 
 clean:

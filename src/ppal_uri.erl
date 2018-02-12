@@ -6,7 +6,6 @@ extract_idx(_Subject, {-1,0}) -> undefined;
 extract_idx(Subject, {Offset,Length}) -> lists:sublist(Subject, Offset+1, Length).
 
 parse_uri(Uri) ->
-    io:format("Parsing uri ~s~n", [Uri]),
     Regex = "^(?<scheme>[^:]+)://(((?<userinfo>[^@]*)@)?(?<host>[^/:?#]+)(:(?<port>\\d+))?)?(/.*)?$",
     case re:run(Uri, Regex, [{capture, [scheme, userinfo, host, port]}]) of
         {match, [SchemeIdx, UserInfoIdx, HostIdx, PortIdx]} ->

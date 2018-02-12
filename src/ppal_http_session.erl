@@ -68,10 +68,18 @@ read_headers(info, {tcp, S, Pkt},
 portstr(undefined) -> "";
 portstr(Num) -> [":", integer_to_list(Num)].
 
+normalize_connect_uri({scheme, Host, Port}) -> lists:flatten([Host, ":", Port]);
+normalize_connect_uri(Str) when is_list(Str) -> Str.
+
 handle_request(Data=#data{req={_RawReq,ParsedReq}}) ->
-    {http_request, _Method, Uri, _Version} = ParsedReq,
-    {absoluteURI, Scheme, Host, Port, Path} = Uri,
-    UrlStr = lists:flatten([atom_to_list(Scheme), "://", Host, portstr(Port), Path]),
+    {http_request, Method, Uri, _Version} = ParsedReq,
+    UrlStr = case Method of
+                 "CONNECT" ->
+                     lists:flatten(["https://", normalize_connect_uri(Uri)]);
+                 _ ->
+                     {absoluteURI, Scheme, Host, Port, Path} = Uri,
+                     lists:flatten([atom_to_list(Scheme), "://", Host, portstr(Port), Path])
+             end,
     [FirstProxy|_Proxies] = ppal_proxylookup:proxies_for_url(UrlStr),
     {ok, ParsedProxy={ProxyScheme, _UserInfo, _Host, _Port}} = ppal_uri:parse_uri(FirstProxy),
     case ProxyScheme of
@@ -85,14 +93,26 @@ start_forwarding(Data, Socket) ->
                   Pkt -> [{next_event, info,
                            {tcp, Data#data.clientsocket, Pkt}}]
               end,
-    R = {next_state, forward_data,Data#data{destsocket=Socket,
+    {next_state, forward_data,Data#data{destsocket=Socket,
                                         clientdata=(<<>>)},
-     Actions},
-    io:format("Start forwarding ~p~n", [R]),
-    R.
+     Actions}.
 
-direct_connect(Data=#data{req={RawReq,ParsedReq},hdrs={RawHdrs,_}}) ->
-    {http_request, _, {absoluteURI, Scheme, DestHost, ParsedPort, _Path}, _} = ParsedReq,
+direct_connect(Data=#data{req={_, {http_request, "CONNECT", HostAndPort, _}}}) ->
+    NormalizedHostAndPort = normalize_connect_uri(HostAndPort),
+    [Host, PortStr] = string:tokens(NormalizedHostAndPort, ":"),
+    Port = list_to_integer(PortStr),
+    case gen_tcp:connect(Host, Port,
+                         [binary, {active, false}]) of
+        {ok, Socket} ->
+            gen_tcp:send(Data#data.clientsocket, ["HTTP/1.1 200 OK\r\n\r\n"]),
+            start_forwarding(Data, Socket);
+        _Error ->
+            {next_state, send_http_error, Data,
+             {next_event, internal, {http_error, 500, "Internal Server Error", ""}}}
+    end;
+direct_connect(Data=#data{req={RawReq, {http_request, _,
+                                        {absoluteURI, Scheme, DestHost, ParsedPort, _Path}, _}},
+                          hdrs={RawHdrs,_}}) ->
     Port = case {ParsedPort,Scheme} of
                {undefined, http} -> 80;
                {undefined, https} -> 443;
@@ -111,8 +131,8 @@ direct_connect(Data=#data{req={RawReq,ParsedReq},hdrs={RawHdrs,_}}) ->
              {next_event, internal, {http_error, 500, "Internal Server Error", ""}}}
     end.
 
-http_connect(Data, {http, ProxyUserInfo, ProxyHost, ProxyPort}) ->
-    ActualPort = case ProxyPort of undefined -> 80; _ -> ProxyPort end,
+http_connect(Data, {"http", ProxyUserInfo, ProxyHost, ProxyPort}) ->
+    ActualPort = case ProxyPort of undefined -> 80; _ -> list_to_integer(ProxyPort) end,
     {RawReq, _} = Data#data.req,
     {RawHdrs, _} = Data#data.hdrs,
     case gen_tcp:connect(ProxyHost, ActualPort,
@@ -142,18 +162,17 @@ send_http_error(internal, {http_error, Status, Msg, Body}, #data{clientsocket=S}
     stop.
 
 forward_data(enter, _, #data{clientsocket=CS, destsocket=DS}) ->
-    io:format("Beginning forwarding ~p <-> ~p~n", [CS,DS]),
     inet:setopts(CS, [{active, once}]),
     inet:setopts(DS, [{active, once}]),
     keep_state_and_data;
 forward_data(info, {tcp, CS, Pkt}, #data{clientsocket=CS, destsocket=DS}) ->
-    io:format("Forwarding client -> dest ~p~n", [Pkt]),
     ok = gen_tcp:send(DS, Pkt),
     repeat_state_and_data;
 forward_data(info, {tcp, DS, Pkt}, #data{clientsocket=CS, destsocket=DS}) ->
-    io:format("Forwarding dest -> client ~p~n", [Pkt]),
     ok = gen_tcp:send(CS, Pkt),
-    repeat_state_and_data.
+    repeat_state_and_data;
+forward_data(info, {tcp_closed, _}, _Data) ->
+    stop.
 
 terminate(_Reason, _State, Data) ->
     gen_tcp:close(Data#data.clientsocket),

@@ -69,4 +69,7 @@ reload() ->
     gen_server:cast(?MODULE, reload).
 
 terminate(_Reason, Port) ->
-    port_close(Port).
+    case Port of
+        undefined -> ok;
+        _ -> port_close(Port)
+    end.
