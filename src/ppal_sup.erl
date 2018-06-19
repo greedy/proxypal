@@ -23,20 +23,20 @@ init(Protocols) ->
       ]}}.
 
 protocol_specs(socks) ->
-    [#{id => ppal_socks_listener,
-       start => {?MODULE, start_socks_listener, []},
-       type => supervisor},
-     #{id => ppal_socks_master,
+    [#{id => ppal_socks_master,
        start => {ppal_master, start_link, [{local, ppal_socks_master},
                                            ppal_socks_session]},
+       type => supervisor},
+     #{id => ppal_socks_listener,
+       start => {?MODULE, start_socks_listener, []},
        type => supervisor}];
 protocol_specs(http) ->
-    [#{id => ppal_http_listener,
-       start => {?MODULE, start_http_listener, []},
-       type => supervisor},
-     #{id => ppal_http_master,
+    [#{id => ppal_http_master,
        start => {ppal_master, start_link, [{local, ppal_http_master},
                                            ppal_http_session]},
+       type => supervisor},
+     #{id => ppal_http_listener,
+       start => {?MODULE, start_http_listener, []},
        type => supervisor}].
 
 
