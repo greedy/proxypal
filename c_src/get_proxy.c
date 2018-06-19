@@ -5,10 +5,17 @@
 #include <inttypes.h>
 #include <arpa/inet.h>
 
+#include <sys/prctl.h>
+#include <sys/capability.h>
+
 #include <proxy.h>
 
 int main(int argc, char **argv)
 {
+    prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0);
+    cap_t caps = cap_get_proc();
+    cap_clear(caps);
+    cap_set_proc(caps);
     /* turn off output buffering */
     setbuf(stdout, NULL);
 
