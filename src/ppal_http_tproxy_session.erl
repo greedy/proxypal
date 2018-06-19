@@ -25,7 +25,9 @@ part_before(Binary, Suffix) ->
 
 read_start_line(enter, _OldState, #data{clientsocket=S}) ->
     keep_state_and_data;
-read_start_line(info, own_socket, Data=#data{clientsocket=S}) ->
+read_start_line(state_timeout, _Info, _Data) ->
+    stop;
+read_start_line(info, own_socket, #data{clientsocket=S}) ->
     inet:setopts(S, [{active, once}, binary, {packet, raw}]),
     keep_state_and_data;
 read_start_line(info, {tcp, S, Pkt}, Data=#data{clientsocket=S}) ->
