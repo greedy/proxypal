@@ -33,7 +33,13 @@ read_start_line(info, own_socket, #data{clientsocket=S}) ->
 read_start_line(info, {tcp, S, Pkt}, Data=#data{clientsocket=S}) ->
     NewPkt = <<(Data#data.clientdata)/binary, Pkt/binary>>,
     case erlang:decode_packet(http, NewPkt, []) of
-        {ok, ParsedReq={http_request, _, _, _}, Rest} ->
+        {ok, {http_request, "CONNECT", _, _}, _Rest} ->
+            {ok, {Ip, _Port}} = inet:sockname(Data#data.clientsocket),
+            direct_connect(Data#data{clientdata=Pkt}, Ip, 80);
+        {ok, {http_request, _, {absoluteURI, _, _, _, _}, _}, _Rest} ->
+            {ok, {Ip, _Port}} = inet:sockname(Data#data.clientsocket),
+            direct_connect(Data#data{clientdata=Pkt}, Ip, 80);
+        {ok, ParsedReq={http_request, _, {abs_path, _}, _}, Rest} ->
             RawReq = part_before(NewPkt, Rest),
             {next_state, read_headers, Data#data{clientdata=(<<>>), req={RawReq,ParsedReq}},
              {next_event, info, {tcp, S, Rest}}};
@@ -76,24 +82,19 @@ normalize_connect_uri({scheme, Host, Port}) -> lists:flatten([Host, ":", Port]);
 normalize_connect_uri(Str) when is_list(Str) -> Str.
 
 handle_request(Data=#data{req={_RawReq,ParsedReq},hdrs={_RawHdrs,ParsedHdrs}}) ->
-    {http_request, Method, Uri, _Version} = ParsedReq,
-    {ok, {Ip, Port}} = inet:sockname(Data#data.clientsocket),
-    UrlStr = case Uri of
-                 {absoluteURI, Scheme, Host, Port, Path} ->
-                     lists:flatten([atom_to_list(Scheme), "://", Host, portstr(Port), Path]);
-                 {abs_path, Path} ->
-                     % Look for the Host header
-                     case lists:keyfind('Host', 3, ParsedHdrs) of
-                         false -> 
-                             % Fall back to IP of socket
-                             case inet:ntoa(Ip) of
-                                 IpString when is_list(IpString) ->
-                                    lists:flatten(["http://", IpString, portstr(Port), Path])
-                            end;
-                         {http_header, _, 'Host', _, Host} ->
-                             lists:flatten(["http://", Host, Path])
-                     end
-             end,
+    {http_request, _Method, {abs_path, Path}, _Version} = ParsedReq,
+    {ok, {Ip, _Port}} = inet:sockname(Data#data.clientsocket),
+    % Look for the Host header
+    UrlStr = case lists:keyfind('Host', 3, ParsedHdrs) of
+        false -> 
+            % Fall back to IP of socket
+            case inet:ntoa(Ip) of
+                IpString when is_list(IpString) ->
+                    lists:flatten(["http://", IpString, Path])
+            end;
+        {http_header, _, 'Host', _, Host} ->
+            lists:flatten(["http://", Host, Path])
+    end,
     [FirstProxy|_Proxies] = ppal_proxylookup:proxies_for_url(UrlStr),
     {ok, ParsedProxy={ProxyScheme, _UserInfo, _Host, _Port}} = ppal_uri:parse_uri(FirstProxy),
     case ProxyScheme of
@@ -111,13 +112,18 @@ start_forwarding(Data, Socket) ->
                                         clientdata=(<<>>)},
      Actions}.
 
-direct_connect(Data=#data{req={RawReq, _ParsedReq}, hdrs={RawHdrs,_ParsedHdrs}}, Ip, Port) ->
+direct_connect(Data=#data{hdrs={RawHdrs,_ParsedHdrs}}, Ip, Port) ->
     {ok, Socket} = gen_tcp:connect(Ip, Port,
                                    [binary, {active, false},
                                     {raw, ?SOL_SOCKET, ?SO_MARK, ?IntOpt(101)}]),
-    ok = gen_tcp:send(Socket, RawReq),
-    ok = gen_tcp:send(Socket, RawHdrs),
-    ok = gen_tcp:send(Socket, "\r\n"),
+    case Data#data.req of
+        {RawReq, _ParsedReq} ->
+            ok = gen_tcp:send(Socket, RawReq),
+            ok = gen_tcp:send(Socket, RawHdrs),
+            ok = gen_tcp:send(Socket, "\r\n");
+        undefined ->
+            ok
+    end,
     start_forwarding(Data, Socket).
 
 to_string(Atom) when is_atom(Atom) -> atom_to_list(Atom);
