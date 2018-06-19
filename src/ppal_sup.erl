@@ -17,14 +17,13 @@ init(Protocols) ->
     PSpecs = lists:flatmap(fun protocol_specs/1, Protocols),
     {ok,
      {#{strategy => one_for_all},
-      PSpecs ++
       [#{id => ppal_ifacewatch,
          start => {ppal_ifacewatch, start_link, []},
          type => worker},
        #{id => ppal_proxylookup,
          start => {ppal_proxylookup, start_link, []},
          type => worker}
-      ]}}.
+      ] ++ PSpecs}}.
 
 protocol_specs(socks) ->
     [#{id => ppal_socks_master,
