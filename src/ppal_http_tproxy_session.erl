@@ -46,6 +46,8 @@ read_start_line(info, {tcp, S, Pkt}, Data=#data{clientsocket=S}) ->
         {more, _Length} ->
             inet:setopts(S, [{active, once}, {packet, raw}]),
             {keep_state, Data#data{clientdata=NewPkt}};
+        {http_error, _Unparsed} ->
+            {stop, bad_start_line};
         {error, Reason} ->
             {stop, Reason}
     end.
@@ -71,6 +73,8 @@ read_headers(info, {tcp, S, Pkt},
         {more, _Length} ->
             inet:setopts(S, [{active, once}, {packet, raw}]),
             {keep_state, Data#data{clientdata=NewPkt}};
+        {http_error, _Unparsed} ->
+            {stop, bad_header};
         {error, Reason} ->
             {stop, Reason}
     end.
