@@ -23,7 +23,7 @@ init(ClientSocket) ->
 part_before(Binary, Suffix) ->
     binary:part(Binary, 0, byte_size(Binary) - byte_size(Suffix)).
 
-read_start_line(enter, _OldState, #data{clientsocket=S}) ->
+read_start_line(enter, _OldState, _Data) ->
     keep_state_and_data;
 read_start_line(state_timeout, _Info, _Data) ->
     stop;
