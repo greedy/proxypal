@@ -1,0 +1,14 @@
+#!/bin/sh
+case "$1" of
+    start)
+        action=--add-rule
+        ;;
+    stop)
+        action=--remove-rule
+        ;;
+    *)
+        exit 1
+        ;;
+esac
+firewall-cmd --direct --query-chain ipv4 mangle mangle proxypal_OUTPUT || exit 0
+firewall-cmd --direct $action ipv4 mangle proxypal_OUTPUT 0 -m cgroup --path "`awk -F':' '^/0:/ { print $3 }'`" -j RETURN

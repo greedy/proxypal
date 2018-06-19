@@ -1,0 +1,17 @@
+[Unit]
+Description=ProxyPal HTTP Transparent Proxy Socket
+Requires=firewalld.service proxypal-tproxy.service
+After=firewalld.service proxypal-tproxy.service
+
+[Install]
+WantedBy=proxypal.service
+
+[Socket]
+ListenStream=0.0.0.0:9080
+Accept=false
+Transparent=true
+Service=proxypal.service
+ExecStartPost=firewall-cmd --direct --add-rule ipv4 nat proxypal_OUTPUT 100 -p tcp --dport 80 -j DNAT --to-destination :9080
+ExecStartPost=firewall-cmd --direct --add-rule ipv4 mangle OUTPUT_direct 0 -p tcp -dport 80 -j proxypal_OUTPUT
+ExecStopPre=firewall-cmd --direct --remove-rule ipv4 mangle OUTPUT_direct 0 -p tcp -dport 80 -j proxypal_OUTPUT
+ExecStopPre=firewall-cmd --direct --remove-rule ipv4 nat proxypal_OUTPUT 100 -p tcp --dport 80 -j DNAT --to-destination :9080

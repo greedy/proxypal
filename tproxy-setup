@@ -1,0 +1,15 @@
+set -e
+netblocks="134.218.0.0/16 132.175.0.0/16 198.102.153.0/24 192.160.227.0/24 198.102.152.0/24 198.102.155.0/24 198.102.154.0/24 198.206.220.0/24 134.253.0.0/16 198.206.222.0/23 205.137.80.0/20" #  2002:400:4410::/48 198.129.92.8/29 2001:400:4413::/64"
+iptables -t mangle -N proxy-magic_OUTPUT || iptables -t mangle -F proxy-magic_OUTPUT
+for block in $netblocks; do
+    iptables -t mangle -A proxy-magic_OUTPUT -d $block -j RETURN
+done
+iptables -t mangle -A proxy-magic_OUTPUT -j MARK --set-mark 99
+iptables -t nat -N proxy-magic_OUTPUT || iptables -t nat -F proxy-magic_OUTPUT
+iptables -t nat -A proxy-magic_OUTPUT -p tcp --dport 80 --j DNAT --to-destination :9080
+iptables -t nat -A proxy-magic_OUTPUT -p tcp --dport 443 --j DNAT --to-destination :9443
+iptables -t mangle -A OUTPUT -p tcp -m multiport --dports 80,443 -j proxy-magic_OUTPUT
+iptables -t nat -A OUTPUT -m mark --mark 99 -j proxy-magic_OUTPUT
+
+ip rule add fwmark 99 lookup 99
+ip route add local default table 99 dev lo

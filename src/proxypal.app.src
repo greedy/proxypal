@@ -4,8 +4,10 @@
   {modules, [@MODULES@]},
   {registered, [ppal_clientsup]},
   {mod, {proxypal, []}},
-  {env, [{enabled_protocols, [socks, http]},
+  {env, [{enabled_protocols, [socks, http, http_tproxy, https_tproxy]},
          {listenaddr, "127.0.0.1"},
          {socksport, 1080},
-         {httpport, 8080}]}
+         {httpport, 8080},
+         {httptproxyport, 9080},
+         {httpstproxyport, 9443}]}
  ]}.

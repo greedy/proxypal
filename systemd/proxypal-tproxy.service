@@ -1,0 +1,19 @@
+[Unit]
+Description=ProxyPal Transparent Proxy Setup
+Requires=firewalld.service
+After=firewalld.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=firewall-cmd --direct --add-chain ipv4 mangle proxypal_OUTPUT
+ExecStart=firewall-cmd --direct --add-rule ipv4 mangle proxypal_OUTPUT 10 -j MARK --set-mark 99
+ExecStart=firewall-cmd --direct --add-chain ipv4 nat proxypal_OUTPUT
+ExecStart=ip rule add fwmark 99 lookup 99
+ExecStart=ip route add local default table 99 dev lo
+ExecStopPost=ip route del local default table 99 dev lo
+ExecStopPost=ip rule del fwmark 99 lookup 99
+ExecStopPost=firewall-cmd --direct --remove-rules ipv4 nat proxypal_OUTPUT
+ExecStopPost=firewall-cmd --direct --remove-chain ipv4 nat proxypal_OUTPUT
+ExecStopPost=firewall-cmd --direct --remove-rules ipv4 mangle proxypal_OUTPUT
+ExecStopPost=firewall-cmd --direct --remove-chain ipv4 mangle proxypal_OUTPUT

@@ -1,0 +1,18 @@
+[Unit]
+Description=ProxyPal
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+User=nobody
+ExecStartPre=+/opt/proxypal/priv/configure-cgroup start
+ExecStart=erlang -pa /opt/proxypal/ebin -eval 'application:start(proxypal)' -noinput
+ExecStopPost=+/opt/proxypal/priv/configure-cgroup stop
+Environment=http_proxy=wpad://
+PrivateTmp=true
+CapabilityBoundingSet=
+SecureBits=noroot-locked
+PrivateDevices=true
+ProtectSystem=true
+ProtectHome=true

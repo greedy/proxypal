@@ -1,0 +1,1 @@
+_PX_DEBUG=1 http_proxy=wpad:// setpriv --reuid=nobody --regid=nobody --clear-groups  --ambient-caps=+net_admin --inh-caps=+net_admin --securebits=+keep_caps_locked erl -pa ebin -eval "application:start(proxypal)" -noshell
