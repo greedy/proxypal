@@ -87,7 +87,7 @@ normalize_connect_uri(Str) when is_list(Str) -> Str.
 
 handle_request(Data=#data{req={_RawReq,ParsedReq},hdrs={_RawHdrs,ParsedHdrs}}) ->
     {http_request, _Method, {abs_path, Path}, _Version} = ParsedReq,
-    {ok, {Ip, _Port}} = inet:sockname(Data#data.clientsocket),
+    {ok, {Ip, _}} = inet:sockname(Data#data.clientsocket),
     % Look for the Host header
     UrlStr = case lists:keyfind('Host', 3, ParsedHdrs) of
         false -> 
